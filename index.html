@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="hu" data-report-mode="gp">
+<head>
+<meta charset="UTF-8">
+<title>Vérnyomásnapló-grafikon és HBPM-jelentés</title>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,500,0,0" rel="stylesheet">
+<link href="style.css?20260629b" rel="stylesheet" />
+<link rel="icon" type="image/png" href="favicon/favicon-96x96.png" sizes="96x96" />
+<link rel="icon" type="image/svg+xml" href="favicon/favicon.svg" />
+<link rel="shortcut icon" href="favicon/favicon.ico" />
+<link rel="apple-touch-icon" sizes="180x180" href="favicon/apple-touch-icon.png" />
+<link rel="manifest" href="favicon/site.webmanifest" />
+
+</head>
+<body class="dark">
+
+<a class="alaphelyzet" href="javascript:window.location.href=window.location.pathname;">Új&nbsp;páciens</a>
+
+<h1>Vérnyomásnapló-grafikon és HBPM-jelentés</h1>
+
+<div class="mode-switch" aria-label="Felhasználói mód">
+	<button type="button" class="mode-option is-active" aria-pressed="true" data-mode-target="index.html">Háziorvos-mód</button>
+	<button type="button" class="mode-option" aria-pressed="false" data-mode-target="kardiologusnak.html">Kardiológus-mód</button>
+</div>
+
+<div class="data-import-panel dashboard">
+	<div class="file-upload-box">
+		<label class="file-upload-label" for="csvFile">CSV-fájl betöltése (rá is dobható a gombra, vagy kezdd el kézzel bevinni a vérnyomásadatokat →)</label>
+		<input type="file" id="csvFile" accept=".csv">
+		<div class="source-status" id="sourceStatus"></div>
+	</div>
+	<div class="direct-data-entry-box">
+		<div class="direct-data-entry-label">Vérnyomás- és pulzusadatok közvetlen hozzáadása</div>
+		<p class="direct-data-entry-note" id="directDataEntryStatus">A betöltött CSV-adatokat kiegészíti; meglévő mérési adat nem módosítható.</p>
+		<button type="button" id="openDirectDataEntryButton">Kézi adatbevitel</button>
+	</div>
+	<div class="person-data-box">
+		<div class="person-data-label">Páciens</div>
+		<div class="person-data-display" id="personDataDisplay"></div>
+		<p class="person-data-note" id="personDataNote">Az azonosítóadatok megadása nem kötelező, de ajánlott.</p>
+		<button type="button" id="openPersonDataButton">Becenév megadása</button>
+	</div>
+	<div class="bp-profile-box">
+		<div class="bp-profile-label">Értékelési profil</div>
+		<div class="bp-profile-display" id="bpProfileDisplay"></div>
+		<p class="bp-profile-note" id="bpProfileNote"></p>
+		<button type="button" id="openBpProfileButton">Profil módosítása</button>
+	</div>
+	<div class="data-actions-box">
+		<div class="data-actions-label">Adatműveletek</div>
+		<div class="data-actions-placeholder">Még nincsenek adatok, ez egy friss vérnyomásnapló.</div>
+		<div class="data-actions" id="dataActions">
+			<button type="button" id="encryptDataButton">Adatok titkosítása</button>
+			<button type="button" class="secondary" id="downloadCsvButton">CSV letöltése</button>
+		</div>
+	</div>
+	<div class="tutorial-box">
+		<a href="" target="_blank">Használati<br  /> útmutatók</a> 
+	</div>
+</div>
+
+<div class="modal-backdrop" id="directDataEntryModal" hidden>
+	<div class="modal-panel direct-data-entry-modal-panel" role="dialog" aria-modal="true" aria-labelledby="directDataEntryModalTitle">
+		<button type="button" class="modal-x-button" id="directDataEntryCloseXButton" aria-label="Bezárás">×</button>
+		<h2 id="directDataEntryModalTitle">Kézi adatbevitel</h2>
+		<p>Töltsd ki a következő méréshármast.<br />Visszamenőleges kitöltésnél léptetheted a napokat nyílbillentyűkkel: <span class="hotkey" id="winlinux">Ctrl+←/→</span><span class="hotkey" id="mac">Option+←/→ vagy Cmd+←/→</span></p>
+		<div class="direct-entry-date-row">
+			<label>
+				Dátum
+				<input type="date" id="directEntryDateInput">
+			</label>
+			<button type="button" class="secondary direct-entry-day-step-button" id="directEntryPrevDayButton" aria-label="Előző nap">←</button>
+			<button type="button" class="secondary direct-entry-day-step-button" id="directEntryNextDayButton" aria-label="Következő nap">→</button>
+			<button type="button" class="secondary" id="directEntryTodayButton">Mai nap</button>
+		</div>
+		<div class="direct-entry-table-wrap">
+			<table class="direct-entry-table">
+				<thead>
+					<tr>
+						<th></th>
+						<th></th>
+						<th colspan="3">1. mérés</th>
+						<th colspan="3">2. mérés</th>
+					</tr>
+					<tr>
+						<th>Dátum</th>
+						<th>Napszak</th>
+						<th>SYS</th><th>DIA</th><th>Pulzus</th>
+						<th>SYS</th><th>DIA</th><th>Pulzus</th>
+					</tr>
+				</thead>
+				<tbody>
+					<tr id="directEntryRegRow" data-direct-entry-slot="REG">
+						<th id="directEntryDatePreview" rowspan="3"></th>
+						<th>REGGEL</th>
+					</tr>
+					<tr id="directEntryDelRow" data-direct-entry-slot="DEL">
+						<th>DÉLBEN</th>
+					</tr>
+					<tr id="directEntryEsteRow" data-direct-entry-slot="ESTE">
+						<th>ESTE</th>
+					</tr>
+				</tbody>
+			</table>
+		</div>
+		<p class="modal-error" id="directDataEntryError"></p>
+		<div class="modal-actions">
+			<p class="modal-warning">A webcímbe történő adatmentés után ne felejtsd el<br />könyvjelzőben tárolni/frissíteni az új webcímet.</p>
+			<button type="button" class="secondary" id="directDataEntrySaveUrlButton">Mentés a webcímbe</button>
+			<button type="button" id="directDataEntryRecordButton">Rögzítés</button>
+		</div>
+	</div>
+</div>
+<div class="report-status" id="reportStatus"></div>
+<p class="minta"><a href="./szivbeteg-vernyomas-minta.csv">Minta-CSV letöltése</a> :: <a href="https://docs.google.com/spreadsheets/d/1ehX_6TuaKLTFFIwkLrPwlph6B34BOdkMmxoA4I2pvcw/edit?usp=sharing" target="_blank">Ezt a Google-táblázatot</a> duplikáld magadhoz, ebbe írd a méréseket, vagy használd a közvetlen Adatbevitelt a vérnyomásnaplód beírására.</p>
+<div class="wrap report-panel" id="reportPanel">
+	<div class="report-header">
+		<h2 id="reportTitle" style="display:none">HBPM-jelentés</h2>
+		<button type="button" id="copyReportButton">Jelentés másolása a Vágólapra</button>
+	</div>
+	<textarea id="reportText" readonly></textarea>
+</div>
+<div class="wrap chart">
+	<canvas id="sysDailyChart"></canvas>
+</div>
+
+<div class="wrap chart">
+	<canvas id="diaDailyChart"></canvas>
+</div>
+
+<div class="wrap chart">
+	<canvas id="pulseDailyChart"></canvas>
+</div>
+
+<div class="wrap reszletes chart ">
+	<canvas id="sysChart"></canvas>
+</div>
+
+<div class="wrap reszletes chart">
+	<canvas id="diaChart"></canvas>
+</div>
+
+<div class="wrap reszletes chart">
+	<canvas id="pulseChart"></canvas>
+</div>
+
+<p class="megjegyzes"></p>
+
+
+<div class="modal-backdrop" id="passwordModal" hidden>
+	<div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="passwordModalTitle">
+		<h2 id="passwordModalTitle"></h2>
+		<p id="passwordModalText"></p>
+		<label>
+			Jelszó
+			<input type="password" id="passwordInput" autocomplete="new-password">
+		</label>
+		<ul class="password-rules" id="passwordRules"></ul>
+		<p class="modal-error" id="passwordModalError"></p>
+		<div class="modal-actions">
+			<button type="button" class="secondary" id="passwordCancelButton">Mégsem</button>
+			<button type="button" id="passwordConfirmButton">OK</button>
+		</div>
+	</div>
+</div>
+
+<div class="modal-backdrop" id="personDataModal" hidden>
+	<div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="personDataModalTitle">
+		<h2 id="personDataModalTitle">Azonosítóadatok</h2>
+		<p>Az azonosítóadatok megadása nem kötelező, de ajánlott.</p>
+		<div class="person-data-fields">
+			<label>
+				Becenév
+				<textarea id="personNicknameInput" rows="1" placeholder="Pista / Gizi"></textarea>
+			</label>
+			<label>
+				Biológiai nem
+				<select id="personSexInput">
+					<option value="">Nincs megadva</option>
+					<option value="nő">nő</option>
+					<option value="férfi">férfi</option>
+					<option value="egyéb">egyéb</option>
+				</select>
+			</label>
+			<label>
+				Életkor
+				<textarea id="personAgeInput" class="short-textarea" rows="1" inputmode="numeric" pattern="[0-9]*"></textarea>
+			</label>
+		</div>
+		<div class="modal-actions">
+			<button type="button" class="secondary" id="personDataCloseButton">Bezárás</button>
+			<button type="button" id="personDataSaveButton">Mentés</button>
+		</div>
+	</div>
+</div>
+
+
+
+<script src="js/utils.js?20260629a"></script>
+<script src="js/data-url.js?20260629a"></script>
+<script src="js/bp-profiles.js?20260629a"></script>
+<script src="js/password-crypto.js?20260629a"></script>
+<script src="js/report.js?20260629a"></script>
+<script src="js/chart-plugins.js?20260629a"></script>
+<script src="js/charts.js?20260629a"></script>
+<script src="js/testdata.js?20260629a"></script>
+<script src="js/app.js?20260629a"></script>
+
+
+</body>
+</html>

@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="hu">
+<head>
+  <meta charset="utf-8">
+  <title>Szívbeteg vérnyomás CSV-generátor</title>
+  <style>
+	body { font-family: Arial, sans-serif; padding: 32px; background: #111; color: #eee; }
+	button { font-size: 18px; padding: 14px 22px; border-radius: 12px; border: 0; cursor: pointer; }
+  </style>
+</head>
+<body>
+
+<button id="generate">Szívbeteg CSV</button>
+
+<script>
+const headers = [
+  "Unnamed: 0",
+  "REG 1 SYS","REG 1 DIA","REG 1 P","REG 2 SYS","REG 2 DIA","REG 2 P",
+  "DÉL 1 SYS","DÉL 1 DIA","DÉL 1 P","DÉL 2 SYS","DÉL 2 DIA","DÉL 2 P",
+  "ESTE 1 SYS","ESTE 1 DIA","ESTE 1 P","ESTE 2 SYS","ESTE 2 DIA","ESTE 2 P"
+];
+
+function randn() {
+  let u = 1 - Math.random();
+  let v = 1 - Math.random();
+  return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+}
+
+function clamp(x, min, max) {
+  return Math.max(min, Math.min(max, x));
+}
+
+function round(x) {
+  return Math.round(x);
+}
+
+function dateStr(date) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}.${m}.${d}.`;
+}
+
+function makePair(mean, pairNoise = 3) {
+  const d = Math.abs(randn() * pairNoise + 1);
+  const firstHigher = Math.random() < 0.65;
+  const a = mean + d / 2;
+  const b = mean - d / 2;
+  return firstHigher ? [round(a), round(b)] : [round(b), round(a)];
+}
+
+function generateCSV(days = 33) {
+  const rows = [headers];
+
+  const start = new Date(2026, 4, 29);
+
+  let bpState = 0;
+  let pulseState = 0;
+
+  for (let i = 0; i < days; i++) {
+	const date = new Date(start);
+	date.setDate(start.getDate() + i);
+
+	// Vérnyomás: lassabb, erősebben autokorrelált állapot
+	bpState = 0.75 * bpState + randn() * 5;
+
+	// Pulzus: külön, részben független állapot
+	pulseState = 0.45 * pulseState + randn() * 4;
+
+	// Időnként önálló pulzuskiugrás, amely nem húzza magával arányosan a vérnyomást
+	const pulseSpike = Math.random() < 0.12 ? (8 + Math.random() * 10) : 0;
+
+	// Időnként vérnyomáskiugrás, amely csak gyengén hat a pulzusra
+	const bpSpike = Math.random() < 0.10 ? (8 + Math.random() * 12) : 0;
+
+	const dayBP = bpState + bpSpike;
+
+	const periods = [
+	  { name: "REG",  sysOffset: 8,  diaOffset: 4,  pOffset: 1 },
+	  { name: "DÉL",  sysOffset: 0,  diaOffset: 0,  pOffset: 3 },
+	  { name: "ESTE", sysOffset: -4, diaOffset: -2, pOffset: -1 }
+	];
+
+	const values = [];
+
+	for (const p of periods) {
+	  const sysMean = clamp(140 + p.sysOffset + dayBP + randn() * 4, 105, 185);
+
+	  // DIA kapcsolódik a SYS-hez, de nem tökéletesen
+	  const diaMean = clamp(
+		82 + p.diaOffset + dayBP * 0.45 + randn() * 3,
+		60, 110
+	  );
+
+	  // Pulzus csak gyengén-közepesen kapcsolódik a vérnyomáshoz
+	  const pulseMean = clamp(
+		70 + p.pOffset + pulseState + dayBP * 0.12 + pulseSpike + randn() * 3,
+		52, 105
+	  );
+
+	  const [sys1, sys2] = makePair(sysMean, 3.2);
+	  const [dia1, dia2] = makePair(diaMean, 2.2);
+	  const [p1, p2] = makePair(pulseMean, 2.8);
+
+	  values.push(sys1, dia1, p1, sys2, dia2, p2);
+	}
+
+	rows.push([dateStr(date), ...values]);
+  }
+
+  return rows.map(row => row.join(",")).join("\n");
+}
+
+document.getElementById("generate").addEventListener("click", () => {
+  const csv = generateCSV(33);
+  const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "szivbeteg-vernyomas-minta.csv";
+  a.click();
+
+  URL.revokeObjectURL(url);
+});
+</script>
+
+</body>
+</html>
